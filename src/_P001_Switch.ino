@@ -15,6 +15,9 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
   static byte switchstate[TASKS_MAX];
   static byte outputstate[TASKS_MAX];
   static byte isInput[17];
+  static byte blink[17];
+  static byte blinkCounter[17];
+  static byte blinkState[17];
 
   switch (function)
   {
@@ -112,12 +115,32 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
           outputstate[event->TaskIndex] = !outputstate[event->TaskIndex];
         }
         isInput[event->TaskIndex] = 1;
+        for (byte y = 0; y <= 16 ; y++)
+        {
+          blink[y] = 0;
+          blinkCounter[y] = 0;
+          blinkState[y] = 0;
+        }
         success = true;
         break;
       }
 
     case PLUGIN_TEN_PER_SECOND:
       {
+        for (byte y = 0; y <= 17; y++)
+        {
+          if (blink[y] > 0)
+          {
+            blinkCounter[y]++;
+            if (blinkCounter[y] > blink[y])
+            {
+              blinkCounter[y] = 0;
+              blinkState[y] = 1-blinkState[y];
+              digitalWrite(y, blinkState[y]);
+              //setPinState(PLUGIN_ID_001, y, PIN_MODE_OUTPUT, blinkState[y]);
+            }
+          }
+        }
         if (isInput[event->TaskIndex] == 0)
         {
           byte state = digitalRead(Settings.TaskDevicePin1[event->TaskIndex]);
@@ -406,6 +429,21 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
           addLog(LOG_LEVEL_INFO, log);
           SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
 
+        }
+        // blink,16,10
+        // stop: blink,16,0
+        if (command == F("blink"))
+        {
+          success = true;
+          pinMode(event->Par1, OUTPUT);
+          setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, 0);
+          isInput[event->Par1] = 0;
+          blink[event->Par1] = event->Par2;
+          blinkState[event->Par1] = 0;
+          blinkCounter[event->Par1] = 0;
+          log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" Blink  ")) + String(event->Par2);
+          addLog(LOG_LEVEL_INFO, log);
+          SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
         }
         break;
       }
