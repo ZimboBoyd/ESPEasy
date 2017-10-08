@@ -13,7 +13,7 @@
 // Note: Up to 4 encoders can be used simultaniously
 
 
-#ifdef PLUGIN_BUILD_TESTING
+//#ifdef PLUGIN_BUILD_TESTING
 
 #define PLUGIN_059
 #define PLUGIN_ID_059         59
@@ -171,4 +171,4 @@ boolean Plugin_059(byte function, struct EventStruct *event, String& string)
   return success;
 }
 
-#endif
+//#endif
