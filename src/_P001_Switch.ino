@@ -14,6 +14,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
   boolean success = false;
   static byte switchstate[TASKS_MAX];
   static byte outputstate[TASKS_MAX];
+  static byte isInput[17];
 
   switch (function)
   {
@@ -110,6 +111,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
           switchstate[event->TaskIndex] = !switchstate[event->TaskIndex];
           outputstate[event->TaskIndex] = !outputstate[event->TaskIndex];
         }
+        isInput[event->TaskIndex] = 1;
         success = true;
         break;
       }
@@ -185,6 +187,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
             pinMode(event->Par1, OUTPUT);
             digitalWrite(event->Par1, event->Par2);
             setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, event->Par2);
+            isInput[event->TaskIndex] = 0;
             log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" Set to ")) + String(event->Par2);
             addLog(LOG_LEVEL_INFO, log);
             SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
@@ -221,6 +224,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
 
             analogWrite(event->Par1, event->Par2);
             setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_PWM, event->Par2);
+            isInput[event->TaskIndex] = 0;
             log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" Set PWM to ")) + String(event->Par2);
             addLog(LOG_LEVEL_INFO, log);
             SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
@@ -237,6 +241,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
             delay(event->Par3);
             digitalWrite(event->Par1, !event->Par2);
             setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, event->Par2);
+            isInput[event->TaskIndex] = 0;
             log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" Pulsed for ")) + String(event->Par3) + String(F(" mS"));
             addLog(LOG_LEVEL_INFO, log);
             SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
@@ -252,6 +257,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
             digitalWrite(event->Par1, event->Par2);
             setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, event->Par2);
             setSystemTimer(event->Par3 * 1000, PLUGIN_ID_001, event->Par1, !event->Par2, 0);
+            isInput[event->TaskIndex] = 0;
             log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" Pulse set for ")) + String(event->Par3) + String(F(" S"));
             addLog(LOG_LEVEL_INFO, log);
             SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
@@ -276,6 +282,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
                 break;
             }
           setPinState(PLUGIN_ID_001, event->Par2, PIN_MODE_SERVO, event->Par3);
+          isInput[event->TaskIndex] = 0;
           log = String(F("SW   : GPIO ")) + String(event->Par2) + String(F(" Servo set to ")) + String(event->Par3);
           addLog(LOG_LEVEL_INFO, log);
           SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par2, log, 0));
@@ -310,6 +317,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
             string.toCharArray(sng, 1024);
             play_rtttl(event->Par1, sng);
             setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, event->Par2);
+            isInput[event->TaskIndex] = 0;
             log = String(F("SW   : ")) + string;
             addLog(LOG_LEVEL_INFO, log);
             SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
@@ -325,6 +333,7 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
             pinMode(event->Par1, OUTPUT);
             tone(event->Par1, event->Par2, event->Par3);
             setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, event->Par2);
+            isInput[event->TaskIndex] = 0;
             log = String(F("SW   : ")) + string;
             addLog(LOG_LEVEL_INFO, log);
             SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
@@ -332,6 +341,69 @@ boolean Plugin_001(byte function, struct EventStruct *event, String& string)
         }
         #endif
 
+        // gpio_is_output,16
+        if (command == F("gpio_is_output"))
+        {
+          success = true;
+          byte mytask = 0;
+          if (event->Par1 >= 0 && event->Par1 <= 16)
+          {
+            // Find event for pin
+            for (byte y = 0; y < TASKS_MAX; y++)
+            {
+              if (Settings.TaskDeviceEnabled[y] && Settings.TaskDeviceNumber[y] != 0)
+              {
+                if (Settings.TaskDevicePin1[y] == event->Par1)
+                {
+                  mytask = y;
+                  break;
+                }
+              }
+            }
+            pinMode(event->Par1, OUTPUT);
+            setPinState(PLUGIN_ID_001, event->Par1, PIN_MODE_OUTPUT, 0);
+            log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" as Output on Task ")) + String(mytask);
+            addLog(LOG_LEVEL_INFO, log);
+            SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
+            isInput[mytask] = 0;
+          }
+
+        }
+        // gpio_is_input,16
+        if (command == F("gpio_is_input"))
+        {
+          success = true;
+          byte mytask = 0;
+          if (event->Par1 >= 0 && event->Par1 <= 16)
+          {
+            // Find event for pin
+            for (byte y = 0; y < TASKS_MAX; y++)
+            {
+              if (Settings.TaskDeviceEnabled[y] && Settings.TaskDeviceNumber[y] != 0)
+              {
+                if (Settings.TaskDevicePin1[y] == event->Par1)
+                {
+                  mytask = y;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (Settings.TaskDevicePin1PullUp[mytask])
+            pinMode(event->Par1, INPUT_PULLUP);
+          else
+            pinMode(Settings.TaskDevicePin1[mytask], INPUT);
+          setPinState(PLUGIN_ID_001, Settings.TaskDevicePin1[mytask], PIN_MODE_INPUT, 0);
+          isInput[mytask] = 1;
+
+          switchstate[mytask] = digitalRead(Settings.TaskDevicePin1[mytask]);
+          outputstate[mytask] = switchstate[mytask];
+          log = String(F("SW   : GPIO ")) + String(event->Par1) + String(F(" as Input on Task ")) + String(mytask);
+          addLog(LOG_LEVEL_INFO, log);
+          SendStatus(event->Source, getPinStateJSON(SEARCH_PIN_STATE, PLUGIN_ID_001, event->Par1, log, 0));
+
+        }
         break;
       }
 
